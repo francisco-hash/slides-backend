@@ -23,7 +23,7 @@ class DeckRequest(BaseModel):
 async def generate_slides(req: DeckRequest):
     try:
         creds = Credentials(token=req.access_token)
-        drive = build("drive", "v3", credentials=creds)
+        drive  = build("drive",  "v3", credentials=creds)
         slides = build("slides", "v1", credentials=creds)
 
         # 1. Copy the template
@@ -34,7 +34,7 @@ async def generate_slides(req: DeckRequest):
 
         pres_id = new_file["id"]
 
-        # 2. Make it publicly accessible
+        # ✅ 2. Make the file accessible to anyone with the link
         drive.permissions().create(
             fileId=pres_id,
             body={
@@ -43,86 +43,27 @@ async def generate_slides(req: DeckRequest):
             }
         ).execute()
 
-        # 3. Build all slide + text requests
+        # 3. Build the slides content (optional: leave as title-only for now)
         requests = []
-        for index, slide in enumerate(req.slides):
-            slide_id = f"slide_{index + 1}"
-            title_box_id = f"title_{index + 1}"
-            text_box_id = f"text_{index + 1}"
-
+        for slide in req.slides:
             requests.append({
                 "createSlide": {
-                    "objectId": slide_id,
                     "insertionIndex": "1",
                     "slideLayoutReference": {
-                        "predefinedLayout": "BLANK"
+                        "predefinedLayout": "TITLE_AND_BODY"
                     }
                 }
             })
+            # Optional: Insert title and text logic (needs object IDs if implemented)
 
-            # Create title box
-            requests.append({
-                "createShape": {
-                    "objectId": title_box_id,
-                    "shapeType": "TEXT_BOX",
-                    "elementProperties": {
-                        "pageObjectId": slide_id,
-                        "size": {
-                            "height": {"magnitude": 50, "unit": "PT"},
-                            "width": {"magnitude": 500, "unit": "PT"}
-                        },
-                        "transform": {
-                            "scaleX": 1,
-                            "scaleY": 1,
-                            "translateX": 50,
-                            "translateY": 50,
-                            "unit": "PT"
-                        }
-                    }
-                }
-            })
-            requests.append({
-                "insertText": {
-                    "objectId": title_box_id,
-                    "text": slide.titulo
-                }
-            })
+        # 4. Apply batch requests to the presentation
+        if requests:
+            slides.presentations().batchUpdate(
+                presentationId=pres_id,
+                body={"requests": requests}
+            ).execute()
 
-            # Create body text box
-            requests.append({
-                "createShape": {
-                    "objectId": text_box_id,
-                    "shapeType": "TEXT_BOX",
-                    "elementProperties": {
-                        "pageObjectId": slide_id,
-                        "size": {
-                            "height": {"magnitude": 200, "unit": "PT"},
-                            "width": {"magnitude": 500, "unit": "PT"}
-                        },
-                        "transform": {
-                            "scaleX": 1,
-                            "scaleY": 1,
-                            "translateX": 50,
-                            "translateY": 120,
-                            "unit": "PT"
-                        }
-                    }
-                }
-            })
-            requests.append({
-                "insertText": {
-                    "objectId": text_box_id,
-                    "text": slide.texto
-                }
-            })
-
-        # 4. Send all batched requests
-        slides.presentations().batchUpdate(
-            presentationId=pres_id,
-            body={"requests": requests}
-        ).execute()
-
-        # 5. Return the presentation link
+        # 5. Return the link
         return {
             "presentationId": pres_id,
             "presentationUrl": f"https://docs.google.com/presentation/d/{pres_id}/edit"
