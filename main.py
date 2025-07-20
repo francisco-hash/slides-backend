@@ -1,13 +1,10 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List
-from typing import Optional
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 import uuid
 
-# ID de plantilla predeterminada de Google Slides
-DEFAULT_TEMPLATE_ID = "1Kl6swruSuhq9KCPMMI7F2eVoDe0NxxeMfUTgpQArpqY"
 
 app = FastAPI()
 
@@ -18,7 +15,7 @@ class SlideItem(BaseModel):
     visualSugerido: str | None = None
 
 class DeckRequest(BaseModel):
-    templateId: Optional[str] = None
+    templateId: str
     title: str
     access_token: str
     slides: List[SlideItem]
@@ -31,9 +28,8 @@ async def generate_slides(req: DeckRequest):
         slides = build("slides", "v1", credentials=creds)
 
         # 1. Copy the template
-        template_id = req.templateId or DEFAULT_TEMPLATE_ID
         new_file = drive.files().copy(
-            fileId=template_id,
+            fileId=req.templateId,
             body={"name": f"{req.title} – {uuid.uuid4().hex[:6]}"}
         ).execute()
         pres_id = new_file["id"]
