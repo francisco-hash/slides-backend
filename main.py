@@ -40,8 +40,7 @@ async def generate_slides(req: DeckRequest):
             body={
                 "type": "anyone",
                 "role": "writer"
-            },
-            supportsAllDrives=True
+            }
         ).execute()
 
         # 3. Build the slides content (optional: leave as title-only for now)
